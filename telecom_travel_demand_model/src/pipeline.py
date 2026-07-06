@@ -13,6 +13,7 @@ import pandas as pd
 
 from src.data_fusion import MultiSourceFusion
 from src.data_ingestion import CellTowerLoader, TelecomDataLoader, ZoneLoader
+from src.mode_detection import ModeDetector
 from src.od_matrix import ODMatrixGenerator
 from src.preprocessing import TelecomPreprocessor, UserFilter
 from src.stay_detection import HomeWorkInference, StayPointDetector
@@ -71,6 +72,7 @@ class TravelDemandPipeline:
         self.stay_detector = StayPointDetector(self.config)
         self.home_work_inference = HomeWorkInference(self.config)
         self.trip_generator = TripGenerator(self.config)
+        self.mode_detector = ModeDetector(self.config)
         self.trip_expander = TripExpander(self.config)
         self.od_generator = ODMatrixGenerator(self.zone_loader, self.config)
 
@@ -116,6 +118,7 @@ class TravelDemandPipeline:
             "detect_stays",
             "infer_home_work",
             "generate_trips",
+            "detect_modes",
             "expand_trips",
             "generate_od_matrix",
         ]
@@ -246,6 +249,19 @@ class TravelDemandPipeline:
             self._results["trip_table"] = self.trip_generator.get_trip_table(
                 self._results["trips"]
             )
+
+        # Step 8b: Detect Travel Mode (no-op unless mode_detection.enabled)
+        if "detect_modes" in steps and "trips" in self._results:
+            logger.info("[Step 8b/10] Detecting travel mode...")
+            self._results["trips"] = self.mode_detector.detect(
+                self._results["trips"],
+                # richer speed/stop features when observations are in memory;
+                # None in chunked mode falls back to trip-level features.
+                self._results.get("preprocessed"),
+            )
+            feature_table = self.mode_detector.get_feature_table()
+            if feature_table is not None:
+                self._results["mode_features"] = feature_table
 
         # Step 9: Expand Trips
         if "expand_trips" in steps:

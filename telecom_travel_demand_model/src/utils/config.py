@@ -180,6 +180,11 @@ class Config:
         """Get data fusion configuration."""
         return self.get("data_fusion", {})
 
+    @property
+    def mode_detection(self) -> Dict[str, Any]:
+        """Get travel-mode detection configuration."""
+        return self.get("mode_detection", {})
+
 
 # Global configuration instance
 _global_config: Optional[Config] = None

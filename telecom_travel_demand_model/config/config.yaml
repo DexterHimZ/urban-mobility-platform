@@ -222,6 +222,54 @@ data_fusion:
   # Temporal alignment window (seconds)
   temporal_window: 60
 
+# Mode Detection Configuration
+# Infers travel mode per trip (public vs private + sub-mode). Mirrors the
+# stay_detection design: config-driven, column-agnostic, pluggable backends.
+mode_detection:
+  # Gated OFF by default: enabling adds a pipeline step after trip generation.
+  enabled: false
+
+  classifier: "rule"      # "rule" (no labels needed) | "ml" (needs trained model)
+  model_path: null        # path to fitted model when classifier == "ml"
+
+  stop_speed_kmh: 3.0     # below this an observation counts as "stopped"
+  emit_feature_table: true  # retain the ML-ready per-trip feature frame
+
+  # Pluggable transit reference for the public-transport branch.
+  # Swap type from "none" -> "synthetic" -> "gtfs" with no code changes.
+  transit_feed:
+    type: "none"          # "none" | "synthetic" | "gtfs"
+    match_radius_m: 150   # max distance (m) for stop/line matching
+    gtfs_dir: null        # dir with stops.txt/routes.txt/stop_times.txt (type: gtfs)
+    synthetic_lines: null # GeoJSON/CSV of OSM transit lines (type: synthetic)
+
+  # First-cut thresholds; override any subtree here to calibrate without code.
+  # Full defaults live in src/mode_detection/classifiers.py::DEFAULT_RULES
+  rules:
+    public:
+      min_align_score: 0.4
+      rail_min_avg_kmh: 40
+      metro_min_avg_kmh: 25
+      bus_max_avg_kmh: 25
+    private_speed_bands_kmh:   # plausible avg-speed range (km/h) gating each mode
+      bicycle: [0, 18]
+      auto: [8, 35]
+      two_wheeler: [15, 50]
+      car: [20, 100]
+      lcv: [25, 65]
+      hcv: [15, 55]
+    private_typical_speed_kmh:  # representative cruising speed; nearest one wins
+      bicycle: 12
+      auto: 22
+      two_wheeler: 32
+      car: 42
+      lcv: 48
+      hcv: 38
+    car_vs_tw:
+      tw_accel_std_min: 0.7
+      tw_road_classes: ["residential", "service", "living_street"]
+      car_road_classes: ["primary", "secondary", "trunk", "motorway"]
+
 # Output Configuration
 output:
   # Output formats
